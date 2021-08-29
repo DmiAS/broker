@@ -90,7 +90,7 @@ func (b *Broker) PutMsg(queueName, data string) {
 	queue.Push(data)
 }
 
-func (b *Broker) GetMsg(name string) string {
+func (b *Broker) getMsg(name string) string {
 	q, ok := b.m[name]
 	if !ok {
 		return ""
@@ -98,43 +98,47 @@ func (b *Broker) GetMsg(name string) string {
 	return q.Pop()
 }
 
-func (b *Broker) GetMsgWithTimeout(name string, timeout time.Duration) string {
+func (b *Broker) GetMsg(name string, timeout time.Duration) string {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	var data string
 
+	data := b.getMsg(name)
 	for data == "" {
+		data = b.getMsg(name)
 		select {
 		case <-ctx.Done():
 			return ""
 		default:
-			data = b.GetMsg(name)
 		}
 	}
 
 	return data
 }
 
+func parseTimeout(t string) (time.Duration, error) {
+	seconds, err := strconv.Atoi(t)
+	if err != nil {
+		return 0, err
+	}
+	timeout := time.Second * time.Duration(seconds)
+	return timeout, nil
+}
+
 func (e *Endpoint) GetMsgHandler(w http.ResponseWriter, r *http.Request) {
 	name := extractQueueNameFromUrl(r.URL.Path)
-	var data string
-	if timeoutString := r.FormValue(timeoutParam); timeoutString != "" {
-		seconds, err := strconv.Atoi(timeoutString)
-		if err != nil {
-			http.NotFound(w, r)
-			return
-		}
-		timeout := time.Second * time.Duration(seconds)
-		data = e.broker.GetMsgWithTimeout(name, timeout)
-	} else {
-		data = e.broker.GetMsg(name)
-	}
-
-	if data == "" {
-		http.NotFound(w, r)
+	timeoutString := r.FormValue(timeoutParam)
+	timeout, err := parseTimeout(timeoutString)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	w.Write([]byte(data))
+
+	if data := e.broker.GetMsg(name, timeout); data == "" {
+		http.NotFound(w, r)
+		return
+	} else {
+		w.Write([]byte(data))
+	}
 }
 
 func (e *Endpoint) PutMsgHandler(w http.ResponseWriter, r *http.Request) {
@@ -160,6 +164,7 @@ func (e *Endpoint) Route(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 	}
 }
+
 func extractQueueNameFromUrl(path string) string {
 	str := reg.FindString(path)
 	if len(str) > 0 {
