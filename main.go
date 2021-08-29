@@ -130,7 +130,7 @@ func (e *Endpoint) GetMsgHandler(w http.ResponseWriter, r *http.Request) {
 	timeout := parseTimeout(timeoutString)
 
 	if data := e.broker.GetMsg(name, timeout); data == "" {
-		http.NotFound(w, r)
+		w.WriteHeader(http.StatusNotFound)
 		return
 	} else {
 		w.Write([]byte(data))
