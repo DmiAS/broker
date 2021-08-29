@@ -115,23 +115,19 @@ func (b *Broker) GetMsg(name string, timeout time.Duration) string {
 	return data
 }
 
-func parseTimeout(t string) (time.Duration, error) {
+func parseTimeout(t string) time.Duration {
 	seconds, err := strconv.Atoi(t)
 	if err != nil {
-		return 0, err
+		return 0
 	}
 	timeout := time.Second * time.Duration(seconds)
-	return timeout, nil
+	return timeout
 }
 
 func (e *Endpoint) GetMsgHandler(w http.ResponseWriter, r *http.Request) {
 	name := extractQueueNameFromUrl(r.URL.Path)
 	timeoutString := r.FormValue(timeoutParam)
-	timeout, err := parseTimeout(timeoutString)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
+	timeout := parseTimeout(timeoutString)
 
 	if data := e.broker.GetMsg(name, timeout); data == "" {
 		http.NotFound(w, r)
