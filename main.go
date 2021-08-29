@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	timeoutParam = "time"
+	timeoutParam = "timeout"
 	msgParam     = "v"
 	pattern      = "/.*"
 )
