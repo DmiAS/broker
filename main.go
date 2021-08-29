@@ -91,11 +91,12 @@ func (b *Broker) GetMsg(name string, timeout time.Duration) string {
 	defer cancel()
 
 	data := b.getMsg(name)
+LOOP:
 	for data == "" {
 		data = b.getMsg(name)
 		select {
 		case <-ctx.Done():
-			return ""
+			break LOOP
 		default:
 		}
 	}
@@ -103,19 +104,24 @@ func (b *Broker) GetMsg(name string, timeout time.Duration) string {
 	return data
 }
 
-func parseTimeout(t string) time.Duration {
+func parseTimeout(t string) (time.Duration, error) {
 	seconds, err := strconv.Atoi(t)
-	if err != nil {
-		return 0
+	if err != nil || seconds < 0 {
+		return 0, errors.New("invalid timeout value")
 	}
 	timeout := time.Second * time.Duration(seconds)
-	return timeout
+	return timeout, nil
 }
 
 func (e *Endpoint) GetMsgHandler(w http.ResponseWriter, r *http.Request) {
-	name := extractQueueNameFromUrl(r.URL.Path)
+	name := r.URL.Path[1:]
 	timeoutString := r.FormValue(timeoutParam)
-	timeout := parseTimeout(timeoutString)
+	timeout, err := parseTimeout(timeoutString)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(err.Error()))
+		return
+	}
 
 	if data := e.broker.GetMsg(name, timeout); data == "" {
 		w.WriteHeader(http.StatusNotFound)
@@ -131,7 +137,7 @@ func (e *Endpoint) PutMsgHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	name := extractQueueNameFromUrl(r.URL.Path)
+	name := r.URL.Path[1:]
 
 	e.broker.PutMsg(name, msg)
 	w.WriteHeader(http.StatusOK)
@@ -147,13 +153,6 @@ func (e *Endpoint) Route(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
-}
-
-func extractQueueNameFromUrl(path string) string {
-	if len(path) > 0 {
-		return path[1:]
-	}
-	return ""
 }
 
 func getPort() (int, error) {
