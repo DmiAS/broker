@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"regexp"
 	"strconv"
 	"sync"
 	"time"
@@ -16,18 +15,7 @@ import (
 const (
 	timeoutParam = "timeout"
 	msgParam     = "v"
-	pattern      = "/.*"
 )
-
-func init() {
-	var err error
-	reg, err = regexp.Compile(pattern)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-var reg *regexp.Regexp
 
 type Node struct {
 	data string
@@ -162,9 +150,8 @@ func (e *Endpoint) Route(w http.ResponseWriter, r *http.Request) {
 }
 
 func extractQueueNameFromUrl(path string) string {
-	str := reg.FindString(path)
-	if len(str) > 0 {
-		return str[1:]
+	if len(path) > 0 {
+		return path[1:]
 	}
 	return ""
 }
