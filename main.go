@@ -113,8 +113,12 @@ func parseTimeout(t string) (time.Duration, error) {
 	return timeout, nil
 }
 
+func extractQueue(path string) string {
+	return path[1:]
+}
+
 func (e *Endpoint) GetMsgHandler(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Path[1:]
+	name := extractQueue(r.URL.Path)
 	timeoutString := r.FormValue(timeoutParam)
 	timeout, err := parseTimeout(timeoutString)
 	if err != nil {
@@ -137,7 +141,7 @@ func (e *Endpoint) PutMsgHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	name := r.URL.Path[1:]
+	name := extractQueue(r.URL.Path)
 
 	e.broker.PutMsg(name, msg)
 	w.WriteHeader(http.StatusOK)
