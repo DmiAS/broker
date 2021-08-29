@@ -151,7 +151,7 @@ func (e *Endpoint) GetMsgHandler(w http.ResponseWriter, r *http.Request) {
 func (e *Endpoint) PutMsgHandler(w http.ResponseWriter, r *http.Request) {
 	msg := r.FormValue(msgParam)
 	if msg == "" {
-		http.NotFound(w, r)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	name := extractQueueNameFromUrl(r.URL.Path)
@@ -185,6 +185,7 @@ func getPort() (int, error) {
 	}
 	return 0, errors.New("port number was not provided")
 }
+
 func main() {
 	broker := Broker{make(map[string]*Queue)}
 	endpoint := &Endpoint{broker: broker}
