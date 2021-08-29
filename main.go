@@ -34,58 +34,48 @@ type Node struct {
 	next *Node
 }
 
-type List struct {
+type Queue struct {
+	mu    sync.Mutex
 	first *Node
 	last  *Node
-}
-
-type Queue struct {
-	mu   sync.Mutex
-	list List
 }
 
 type Broker struct {
 	m map[string]*Queue
 }
+
 type Endpoint struct {
 	broker Broker
-}
-
-func (l *List) PushBack(node *Node) {
-	if l.first == nil {
-		l.first = node
-		l.last = l.first
-	} else {
-		l.last.next = node
-		l.last = node
-	}
-}
-
-func (l *List) PopFront() *Node {
-	node := l.first
-	if l.first != nil {
-		l.first = l.first.next
-	}
-	if l.first == nil {
-		l.last = nil
-	}
-	return node
 }
 
 func (q *Queue) Push(msg string) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	newNode := &Node{data: msg}
-	q.list.PushBack(newNode)
+
+	node := &Node{data: msg}
+	if q.first == nil {
+		q.first = node
+		q.last = q.first
+	} else {
+		q.last.next = node
+		q.last = node
+	}
 }
 
 func (q *Queue) Pop() string {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	node := q.list.PopFront()
+
+	node := q.first
+	if q.first != nil {
+		q.first = q.first.next
+	}
+	if q.first == nil {
+		q.last = nil
+	}
 
 	var data string
-	if node != nil{
+	if node != nil {
 		data = node.data
 	}
 	return data
@@ -100,16 +90,15 @@ func (b *Broker) PutMsg(queueName, data string) {
 	queue.Push(data)
 }
 
-
-func (b *Broker) GetMsg(name string) string{
+func (b *Broker) GetMsg(name string) string {
 	q, ok := b.m[name]
-	if !ok{
+	if !ok {
 		return ""
 	}
 	return q.Pop()
 }
 
-func (b *Broker) GetMsgWithTimeout(name string, timeout time.Duration) string{
+func (b *Broker) GetMsgWithTimeout(name string, timeout time.Duration) string {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	var data string
@@ -141,7 +130,7 @@ func (e *Endpoint) GetMsgHandler(w http.ResponseWriter, r *http.Request) {
 		data = e.broker.GetMsg(name)
 	}
 
-	if data == ""{
+	if data == "" {
 		http.NotFound(w, r)
 		return
 	}
@@ -173,7 +162,7 @@ func (e *Endpoint) Route(w http.ResponseWriter, r *http.Request) {
 }
 func extractQueueNameFromUrl(path string) string {
 	str := reg.FindString(path)
-	if len(str) > 0{
+	if len(str) > 0 {
 		return str[1:]
 	}
 	return ""
