@@ -29,7 +29,8 @@ type Queue struct {
 }
 
 type Broker struct {
-	m map[string]*Queue
+	m  map[string]*Queue
+	mu sync.RWMutex
 }
 
 type Endpoint struct {
@@ -70,16 +71,20 @@ func (q *Queue) Pop() string {
 }
 
 func (b *Broker) PutMsg(queueName, data string) {
+	b.mu.Lock()
 	queue, ok := b.m[queueName]
 	if !ok {
 		queue = new(Queue)
 		b.m[queueName] = queue
 	}
+	b.mu.Unlock()
 	queue.Push(data)
 }
 
 func (b *Broker) getMsg(name string) string {
+	b.mu.RLock()
 	q, ok := b.m[name]
+	b.mu.RUnlock()
 	if !ok {
 		return ""
 	}
@@ -105,6 +110,9 @@ LOOP:
 }
 
 func parseTimeout(t string) (time.Duration, error) {
+	if t == "" {
+		return 0, nil
+	}
 	seconds, err := strconv.Atoi(t)
 	if err != nil || seconds < 0 {
 		return 0, errors.New("invalid timeout value")
@@ -167,7 +175,7 @@ func getPort() (int, error) {
 }
 
 func main() {
-	broker := Broker{make(map[string]*Queue)}
+	broker := Broker{m: make(map[string]*Queue)}
 	endpoint := &Endpoint{broker: broker}
 	port, err := getPort()
 	if err != nil {
